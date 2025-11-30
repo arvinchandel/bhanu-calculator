@@ -354,3 +354,4 @@ if st.expander("Show calculation history"):
     for item in reversed(st.session_state.history[-20:]):
         st.write(f"{item['time']} — **{item['op']}** — inputs: {item['inputs']} — result: `{item['result']}`")
 
+
