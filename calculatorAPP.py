@@ -47,7 +47,7 @@ st.markdown(CARD_CSS, unsafe_allow_html=True)
 # ---------------- Background image ----------------
 # Replace the filename below with the exact name you uploaded to your GitHub repo.
 # If the image is in a subfolder, include the folder: Path("images/your-image.jpg")
-LOCAL_IMAGE_PATH = Path("E:\Wallpapers\stormtrooper-on-pink-background-pop-art-desktop-wallpaper-4k.jpg")
+LOCAL_IMAGE_PATH = Path("stormtrooper-on-pink-background-pop-art-desktop-wallpaper-4k.jpg")
 BG_URL: Optional[str] = None  # or set a public URL string if you prefer
 
 def set_background(local_path: Optional[Path], url: Optional[str]) -> None:
@@ -352,3 +352,4 @@ st.markdown("</div>", unsafe_allow_html=True)  # close calc-card
 if st.expander("Show calculation history"):
     for item in reversed(st.session_state.history[-20:]):
         st.write(f"{item['time']} — **{item['op']}** — inputs: {item['inputs']} — result: `{item['result']}`")
+
