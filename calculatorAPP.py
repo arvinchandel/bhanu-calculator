@@ -12,7 +12,6 @@ st.set_page_config(
     layout="centered"
 )
 
-
 # ---------------- Theme & card styling ----------------
 CARD_CSS = """
 <style>
@@ -48,7 +47,7 @@ st.markdown(CARD_CSS, unsafe_allow_html=True)
 # ---------------- Background image ----------------
 # Replace the filename below with the exact name you uploaded to your GitHub repo.
 # If the image is in a subfolder, include the folder: Path("images/your-image.jpg")
-LOCAL_IMAGE_PATH = Path("stormtrooper-on-pink-background-pop-art-desktop-wallpaper-4k.jpg")
+LOCAL_IMAGE_PATH = Path("E:\Wallpapers\stormtrooper-on-pink-background-pop-art-desktop-wallpaper-4k.jpg")
 BG_URL: Optional[str] = None  # or set a public URL string if you prefer
 
 def set_background(local_path: Optional[Path], url: Optional[str]) -> None:
@@ -120,17 +119,18 @@ def try_float_list(text: str):
             return None
     return vals
 
+# Replace your existing show_result with this
 def show_result(result, operation: str, inputs: str):
-    with st.container():
-        st.markdown("<div class='section-title'>Result</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='result-box'>{result}</div>", unsafe_allow_html=True)
-        add_history(operation, inputs, result)
-        cols = st.columns([1,1])
-        with cols[0]:
-            if st.button("Copy result", key=f"copy_{operation}_{len(st.session_state.history)}"):
-                st.code(str(result))
-        with cols[1]:
-            st.info("Result saved to history.")
+    # store result so it persists across reruns
+    st.session_state["last_result"] = {"result": result, "op": operation, "inputs": inputs}
+    # also add to history
+    add_history(operation, inputs, result)
+
+# After your menu and calculation logic, render the last result (place this once, near top of UI)
+if "last_result" in st.session_state:
+    r = st.session_state["last_result"]
+    st.markdown("<div class='section-title'>Result</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='result-box'>{r['result']}</div>", unsafe_allow_html=True)
 
 def trig_value(x: float, func: str):
     # Handles degrees/radians based on toggle
@@ -353,6 +353,3 @@ st.markdown("</div>", unsafe_allow_html=True)  # close calc-card
 if st.expander("Show calculation history"):
     for item in reversed(st.session_state.history[-20:]):
         st.write(f"{item['time']} — **{item['op']}** — inputs: {item['inputs']} — result: `{item['result']}`")
-
-
-
