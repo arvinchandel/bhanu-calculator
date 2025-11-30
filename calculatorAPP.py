@@ -11,14 +11,7 @@ st.set_page_config(
     page_icon="🧮",
     layout="centered"
 )
-[data-testid="stAppViewContainer"]::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.06);
-  pointer-events: none;
-  z-index: -1;   /* <- ensure overlay is behind content */
-}
+
 
 # ---------------- Theme & card styling ----------------
 CARD_CSS = """
@@ -360,5 +353,6 @@ st.markdown("</div>", unsafe_allow_html=True)  # close calc-card
 if st.expander("Show calculation history"):
     for item in reversed(st.session_state.history[-20:]):
         st.write(f"{item['time']} — **{item['op']}** — inputs: {item['inputs']} — result: `{item['result']}`")
+
 
 
