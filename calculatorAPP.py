@@ -1,0 +1,349 @@
+import streamlit as st
+import math
+import base64
+from pathlib import Path
+from datetime import datetime
+
+# ---------------- Page config ----------------
+st.set_page_config(
+    page_title="Bhanu's Scientific Calculator",
+    page_icon="🧮",
+    layout="centered"
+)
+
+# ---------------- Theme & card styling ----------------
+CARD_CSS = """
+<style>
+[data-testid="stHeader"] { background: rgba(0,0,0,0); }
+[data-testid="stToolbar"] { right: 2rem; }
+
+.calc-card {
+    background: rgba(255,255,255,0.92);
+    border-radius: 12px;
+    padding: 18px 16px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    max-width: 720px;
+    margin: 0 auto;
+}
+.section-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+.result-box {
+    background: #f7f7f9;
+    border: 1px solid #e6e6eb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+.copy-btn .stButton>button {
+    width: 100%;
+}
+</style>
+"""
+st.markdown(CARD_CSS, unsafe_allow_html=True)
+
+#  Background image
+
+LOCAL_IMAGE_PATH = Path(r"E:\Wallpapers\stormtrooper-on-pink-background-pop-art-desktop-wallpaper-4k.jpg")
+
+def set_background(local_path: Path, url: str | None):
+    if url:
+        css = f"""
+        <style>
+        [data-testid="stAppViewContainer"] {{
+            background-image: url("{url}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }}
+        </style>
+        """
+        st.markdown(css, unsafe_allow_html=True)
+        return
+
+    if local_path.exists():
+        ext = local_path.suffix.lower().replace(".", "")
+        mime = "image/jpeg" if ext in ("jpg", "jpeg") else "image/png"
+        with open(local_path, "rb") as f:
+            data64 = base64.b64encode(f.read()).decode()
+        css = f"""
+        <style>
+        [data-testid="stAppViewContainer"] {{
+            background-image: url("data:{mime};base64,{data64}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }}
+        </style>
+        """
+        st.markdown(css, unsafe_allow_html=True)
+    else:
+        st.warning(f"Background image not found at: {local_path}")
+
+set_background(LOCAL_IMAGE_PATH, BG_URL)
+
+# ---------------- App state ----------------
+if "memory" not in st.session_state:
+    st.session_state.memory = None
+if "history" not in st.session_state:
+    st.session_state.history = []
+if "angle_unit" not in st.session_state:
+    st.session_state.angle_unit = "Degrees"  # or "Radians"
+
+# ---------------- Helpers ----------------
+def add_history(operation: str, inputs: str, result):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.session_state.history.append({
+        "time": ts,
+        "op": operation,
+        "inputs": inputs,
+        "result": result
+    })
+
+def try_float_list(text: str):
+    vals = []
+    for t in text.split():
+        try:
+            vals.append(float(t))
+        except ValueError:
+            return None
+    return vals
+
+def show_result(result, operation: str, inputs: str):
+    with st.container():
+        st.markdown("<div class='section-title'>Result</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='result-box'>{result}</div>", unsafe_allow_html=True)
+        add_history(operation, inputs, result)
+        cols = st.columns([1,1])
+        with cols[0]:
+            if st.button("Copy result", key=f"copy_{operation}_{len(st.session_state.history)}"):
+                # Streamlit can't write directly to clipboard without JS; show code block as copy-friendly
+                st.code(str(result))
+        with cols[1]:
+            st.info("Result saved to history.")
+
+def trig_value(x: float, func: str):
+    # Handles degrees/radians based on toggle
+    if st.session_state.angle_unit == "Degrees":
+        x = math.radians(x)
+    if func == "sin":
+        return math.sin(x)
+    if func == "cos":
+        return math.cos(x)
+    if func == "tan":
+        return math.tan(x)
+    raise ValueError("Invalid trig function")
+
+# ---------------- UI ----------------
+st.title("🧮 Bhanu's  Calculator")
+
+# Angle unit toggle (global UX improvement)
+st.toggle(
+    "Use radians (off = degrees)",
+    value=(st.session_state.angle_unit == "Radians"),
+    key="angle_toggle"
+)
+st.session_state.angle_unit = "Radians" if st.session_state.angle_toggle else "Degrees"
+
+st.markdown("<div class='calc-card'>", unsafe_allow_html=True)
+
+menu = [
+    "Addition", "Subtraction", "Multiplication", "Division",
+    "Power (x^y)", "Modulus (x % y)", "Square Root", "Cube Root",
+    "Logarithm (base 10)", "Natural Log (ln)", "Exponential (e^x)",
+    "Factorial", "Sine", "Cosine", "Tangent",
+    "Degree → Radian", "Radian → Degree", "Pi (constant)",
+    "Show Memory", "Memory Add (M+)", "Memory Subtract (M-)", "Memory Recall (MR)", "Memory Clear (MC)",
+    "Percentage", "Average / Mean", "Median",
+]
+
+choice = st.selectbox("Choose an operation:", menu)
+
+# ---------------- Operations ----------------
+
+# Two-number ops
+if choice in ["Addition","Subtraction","Multiplication","Division","Power (x^y)","Modulus (x % y)"]:
+    num1 = st.number_input("Enter first number", value=0.0)
+    num2 = st.number_input("Enter second number", value=0.0)
+    if st.button("Calculate"):
+        try:
+            if choice == "Addition":
+                result = num1 + num2
+            elif choice == "Subtraction":
+                result = num1 - num2
+            elif choice == "Multiplication":
+                result = num1 * num2
+            elif choice == "Division":
+                if num2 == 0:
+                    st.error("Division by zero is not allowed.")
+                    result = "Error: Division by zero"
+                else:
+                    result = num1 / num2
+            elif choice == "Power (x^y)":
+                result = math.pow(num1, num2)
+            elif choice == "Modulus (x % y)":
+                if num2 == 0:
+                    st.error("Modulus by zero is not allowed.")
+                    result = "Error: Modulus by zero"
+                else:
+                    result = num1 % num2
+            show_result(result, choice, f"{num1}, {num2}")
+            if isinstance(result, (int, float)) and not isinstance(result, bool):
+                st.session_state.memory = result
+        except Exception as e:
+            st.error(f"Calculation error: {e}")
+
+# One-number ops
+elif choice in ["Square Root","Cube Root","Logarithm (base 10)","Natural Log (ln)","Exponential (e^x)","Factorial","Sine","Cosine","Tangent"]:
+    num = st.number_input("Enter number", value=0.0)
+    if st.button("Calculate"):
+        try:
+            if choice == "Square Root":
+                if num < 0:
+                    st.error("Square root of a negative number is not real.")
+                    result = "Error: negative input"
+                else:
+                    result = math.sqrt(num)
+            elif choice == "Cube Root":
+                # cube root works for negative too
+                result = math.copysign(abs(num) ** (1/3), num)
+            elif choice == "Logarithm (base 10)":
+                if num <= 0:
+                    st.error("Logarithm is defined for positive numbers only.")
+                    result = "Error: non-positive input"
+                else:
+                    result = math.log10(num)
+            elif choice == "Natural Log (ln)":
+                if num <= 0:
+                    st.error("Natural log is defined for positive numbers only.")
+                    result = "Error: non-positive input"
+                else:
+                    result = math.log(num)
+            elif choice == "Exponential (e^x)":
+                result = math.exp(num)
+            elif choice == "Factorial":
+                if num < 0 or not float(num).is_integer():
+                    st.error("Factorial is defined for non-negative integers only.")
+                    result = "Error: invalid input"
+                else:
+                    result = math.factorial(int(num))
+            elif choice == "Sine":
+                result = trig_value(num, "sin")
+            elif choice == "Cosine":
+                result = trig_value(num, "cos")
+            elif choice == "Tangent":
+                result = trig_value(num, "tan")
+            show_result(result, choice, f"{num}")
+            if isinstance(result, (int, float)) and not isinstance(result, bool):
+                st.session_state.memory = result
+        except Exception as e:
+            st.error(f"Calculation error: {e}")
+
+# Conversions
+elif choice == "Degree → Radian":
+    deg = st.number_input("Enter angle in degrees", value=0.0)
+    if st.button("Convert"):
+        try:
+            result = math.radians(deg)
+            show_result(result, choice, f"{deg}°")
+        except Exception as e:
+            st.error(f"Conversion error: {e}")
+
+elif choice == "Radian → Degree":
+    rad = st.number_input("Enter angle in radians", value=0.0)
+    if st.button("Convert"):
+        try:
+            result = math.degrees(rad)
+            show_result(result, choice, f"{rad} rad")
+        except Exception as e:
+            st.error(f"Conversion error: {e}")
+
+# Constant
+elif choice == "Pi (constant)":
+    if st.button("Show Pi"):
+        result = math.pi
+        show_result(result, choice, "π")
+
+# Memory options (enhanced)
+elif choice == "Show Memory":
+    st.info(f"Memory: {st.session_state.memory}" if st.session_state.memory is not None else "Memory is empty")
+
+elif choice == "Memory Add (M+)":
+    val = st.number_input("Add value to memory (M+)", value=0.0)
+    if st.button("Apply M+"):
+        if st.session_state.memory is None:
+            st.session_state.memory = val
+        else:
+            st.session_state.memory += val
+        st.success(f"Memory updated: {st.session_state.memory}")
+
+elif choice == "Memory Subtract (M-)":
+    val = st.number_input("Subtract value from memory (M-)", value=0.0)
+    if st.button("Apply M-"):
+        if st.session_state.memory is None:
+            st.session_state.memory = -val
+        else:
+            st.session_state.memory -= val
+        st.success(f"Memory updated: {st.session_state.memory}")
+
+elif choice == "Memory Recall (MR)":
+    if st.session_state.memory is not None:
+        st.success(f"Memory recalled: {st.session_state.memory}")
+    else:
+        st.warning("Memory is empty")
+
+elif choice == "Memory Clear (MC)":
+    st.session_state.memory = None
+    st.warning("Memory cleared")
+
+# Percentage
+elif choice == "Percentage":
+    num = st.number_input("Enter the number", value=0.0)
+    percent = st.number_input("Enter the percentage (%)", value=0.0)
+    if st.button("Calculate"):
+        try:
+            result = (percent / 100.0) * num
+            show_result(result, choice, f"{percent}% of {num}")
+            st.session_state.memory = result
+        except Exception as e:
+            st.error(f"Calculation error: {e}")
+
+# Mean
+elif choice == "Average / Mean":
+    nums = st.text_input("Enter numbers separated by spaces (e.g., 10 20 30)")
+    if st.button("Calculate"):
+        vals = try_float_list(nums)
+        if vals is None or len(vals) == 0:
+            st.error("Please enter valid numbers separated by spaces.")
+        else:
+            result = sum(vals) / len(vals)
+            show_result(result, choice, nums)
+            st.session_state.memory = result
+
+# Median
+elif choice == "Median":
+    nums = st.text_input("Enter numbers separated by spaces (e.g., 10 20 30)")
+    if st.button("Calculate"):
+        vals = try_float_list(nums)
+        if vals is None or len(vals) == 0:
+            st.error("Please enter valid numbers separated by spaces.")
+        else:
+            vals.sort()
+            n = len(vals)
+            result = vals[n//2] if n % 2 == 1 else (vals[n//2 - 1] + vals[n//2]) / 2
+            show_result(result, choice, nums)
+            st.session_state.memory = result
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ---------------- History ----------------
+with st.expander("History"):
+    if not st.session_state.history:
+        st.write("No calculations yet.")
+    else:
+        for item in reversed(st.session_state.history):
+            st.write(f"[{item['time']}] {item['op']} | inputs: {item['inputs']} | result: {item['result']}")
+        if st.button("Clear history"):
+            st.session_state.history = []
+            st.success("History cleared.")
