@@ -1,3 +1,4 @@
+# calculatorAPP.py
 import streamlit as st
 import math
 import base64
@@ -7,7 +8,7 @@ from typing import Optional
 
 # ---------------- Page config ----------------
 st.set_page_config(
-    page_title="Bhanu's  Calculator",
+    page_title="Bhanu's Scientific Calculator",
     page_icon="🧮",
     layout="centered"
 )
@@ -44,53 +45,94 @@ CARD_CSS = """
 """
 st.markdown(CARD_CSS, unsafe_allow_html=True)
 
-# ---------------- Background image ----------------
-# Replace the filename below with the exact name you uploaded to your GitHub repo.
-# If the image is in a subfolder, include the folder: Path("images/your-image.jpg")
-LOCAL_IMAGE_PATH = Path("stormtrooper-on-pink-background-pop-art-desktop-wallpaper-4k.jpg")
-BG_URL: Optional[str] = None  # or set a public URL string if you prefer
+# ---------------- Responsive background ----------------
+# Update these filenames to match the exact files you uploaded to your GitHub repo.
+# If you only uploaded one image, set both to the same filename.
+DESKTOP_IMG = Path("stormtrooper-on-pink-background-pop-art-desktop-wallpaper-4k.jpg")
+MOBILE_IMG = Path("stormtrooper-on-pink-background-pop-art-desktop-wallpaper-4k.jpg")
+# If you prefer to use a hosted URL for desktop background, set BG_URL to that string.
+BG_URL: Optional[str] = None
 
-def set_background(local_path: Optional[Path], url: Optional[str]) -> None:
-    """Set background from a local file in the repo or from a URL.
-    Pass None for the source you don't want to use."""
-    if url:
-        css = f"""
-        <style>
-        [data-testid="stAppViewContainer"] {{
-            background-image: url("{url}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }}
-        </style>
-        """
-        st.markdown(css, unsafe_allow_html=True)
+def _to_data_uri(path: Optional[Path]) -> Optional[str]:
+    if not path:
+        return None
+    if not path.exists():
+        return None
+    ext = path.suffix.lower().replace(".", "")
+    if ext in ("webp",):
+        mime = "image/webp"
+    elif ext in ("jpg", "jpeg"):
+        mime = "image/jpeg"
+    elif ext in ("png",):
+        mime = "image/png"
+    else:
+        mime = "application/octet-stream"
+    with open(path, "rb") as f:
+        data64 = base64.b64encode(f.read()).decode()
+    return f"data:{mime};base64,{data64}"
+
+def set_responsive_background(desktop_path: Path, mobile_path: Path, url: Optional[str] = None) -> None:
+    """Set a responsive background using either repo images or a URL.
+    Pass None for url to use local images embedded as data URIs."""
+    desktop_uri = url if url else _to_data_uri(desktop_path)
+    mobile_uri = _to_data_uri(mobile_path)
+
+    # If neither source is available, do nothing (app continues without background)
+    if not desktop_uri and not mobile_uri:
+        st.warning("No background image found in the repo and no BG_URL provided.")
         return
 
-    if local_path:
-        # local_path should be relative to the repo root (where Streamlit runs)
-        if local_path.exists():
-            ext = local_path.suffix.lower().replace(".", "")
-            mime = "image/jpeg" if ext in ("jpg", "jpeg") else "image/png"
-            with open(local_path, "rb") as f:
-                data64 = base64.b64encode(f.read()).decode()
-            css = f"""
-            <style>
-            [data-testid="stAppViewContainer"] {{
-                background-image: url("data:{mime};base64,{data64}");
-                background-size: cover;
-                background-position: center;
-                background-repeat: no-repeat;
-            }}
-            </style>
-            """
-            st.markdown(css, unsafe_allow_html=True)
-            return
-        else:
-            st.warning(f"Background image not found at: {local_path}")
+    # Fallbacks: if mobile missing, use desktop; if desktop missing but URL provided, use URL
+    if not mobile_uri:
+        mobile_uri = desktop_uri
 
-# Call with both parameters (one can be None)
-set_background(LOCAL_IMAGE_PATH, BG_URL)
+    css = f"""
+    <style>
+    [data-testid="stAppViewContainer"] {{
+        background-image: url("{desktop_uri}");
+        background-size: cover;
+        background-position: center center;
+        background-repeat: no-repeat;
+        background-attachment: scroll;
+        min-height: 100vh;
+    }}
+
+    [data-testid="stAppViewContainer"]::before {{
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.10);
+        pointer-events: none;
+        z-index: 0;
+    }}
+
+    /* Ensure main content sits above overlay */
+    .css-1d391kg, .css-1lcbmhc, .stApp, .main {{
+        z-index: 1;
+        position: relative;
+    }}
+
+    @media (max-width: 767px) {{
+        [data-testid="stAppViewContainer"] {{
+            background-image: url("{mobile_uri}");
+            background-size: cover;
+            background-position: center top;
+            background-attachment: scroll;
+            -webkit-background-size: cover;
+        }}
+    }}
+
+    @media (max-width: 420px) {{
+        [data-testid="stAppViewContainer"] {{
+            background-position: center 20%;
+        }}
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+# Call the responsive background function
+set_responsive_background(DESKTOP_IMG, MOBILE_IMG, BG_URL)
 
 # ---------------- App state ----------------
 if "memory" not in st.session_state:
@@ -146,7 +188,7 @@ def trig_value(x: float, func: str):
 # ---------------- UI ----------------
 st.title("🧮 Bhanu's  Calculator")
 
-# Angle unit toggle (use checkbox instead of st.toggle)
+# Angle unit toggle
 use_radians = st.checkbox("Use radians (unchecked = degrees)", value=(st.session_state.angle_unit == "Radians"))
 st.session_state.angle_unit = "Radians" if use_radians else "Degrees"
 
@@ -268,7 +310,7 @@ elif choice == "Pi (constant)":
         result = math.pi
         show_result(result, choice, "π")
 
-# Memory options (completed)
+# Memory options
 elif choice == "Show Memory":
     st.info(f"Memory: {st.session_state.memory}" if st.session_state.memory is not None else "Memory is empty")
 
@@ -352,4 +394,3 @@ st.markdown("</div>", unsafe_allow_html=True)  # close calc-card
 if st.expander("Show calculation history"):
     for item in reversed(st.session_state.history[-20:]):
         st.write(f"{item['time']} — **{item['op']}** — inputs: {item['inputs']} — result: `{item['result']}`")
-
