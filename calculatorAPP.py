@@ -3,10 +3,11 @@ import math
 import base64
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 # ---------------- Page config ----------------
 st.set_page_config(
-    page_title="Bhanu's Scientific Calculator",
+    page_title="Bhanu's  Calculator",
     page_icon="🧮",
     layout="centered"
 )
@@ -43,11 +44,15 @@ CARD_CSS = """
 """
 st.markdown(CARD_CSS, unsafe_allow_html=True)
 
-#  Background image
+# ---------------- Background image ----------------
+# Replace the filename below with the exact name you uploaded to your GitHub repo.
+# If the image is in a subfolder, include the folder: Path("images/your-image.jpg")
+LOCAL_IMAGE_PATH = Path("E:\Wallpapers\stormtrooper-on-pink-background-pop-art-desktop-wallpaper-4k.jpg")
+BG_URL: Optional[str] = None  # or set a public URL string if you prefer
 
-LOCAL_IMAGE_PATH = Path(r"E:\Wallpapers\stormtrooper-on-pink-background-pop-art-desktop-wallpaper-4k.jpg")
-
-def set_background(local_path: Path, url: str | None):
+def set_background(local_path: Optional[Path], url: Optional[str]) -> None:
+    """Set background from a local file in the repo or from a URL.
+    Pass None for the source you don't want to use."""
     if url:
         css = f"""
         <style>
@@ -62,25 +67,29 @@ def set_background(local_path: Path, url: str | None):
         st.markdown(css, unsafe_allow_html=True)
         return
 
-    if local_path.exists():
-        ext = local_path.suffix.lower().replace(".", "")
-        mime = "image/jpeg" if ext in ("jpg", "jpeg") else "image/png"
-        with open(local_path, "rb") as f:
-            data64 = base64.b64encode(f.read()).decode()
-        css = f"""
-        <style>
-        [data-testid="stAppViewContainer"] {{
-            background-image: url("data:{mime};base64,{data64}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }}
-        </style>
-        """
-        st.markdown(css, unsafe_allow_html=True)
-    else:
-        st.warning(f"Background image not found at: {local_path}")
+    if local_path:
+        # local_path should be relative to the repo root (where Streamlit runs)
+        if local_path.exists():
+            ext = local_path.suffix.lower().replace(".", "")
+            mime = "image/jpeg" if ext in ("jpg", "jpeg") else "image/png"
+            with open(local_path, "rb") as f:
+                data64 = base64.b64encode(f.read()).decode()
+            css = f"""
+            <style>
+            [data-testid="stAppViewContainer"] {{
+                background-image: url("data:{mime};base64,{data64}");
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+            }}
+            </style>
+            """
+            st.markdown(css, unsafe_allow_html=True)
+            return
+        else:
+            st.warning(f"Background image not found at: {local_path}")
 
+# Call with both parameters (one can be None)
 set_background(LOCAL_IMAGE_PATH, BG_URL)
 
 # ---------------- App state ----------------
@@ -118,7 +127,6 @@ def show_result(result, operation: str, inputs: str):
         cols = st.columns([1,1])
         with cols[0]:
             if st.button("Copy result", key=f"copy_{operation}_{len(st.session_state.history)}"):
-                # Streamlit can't write directly to clipboard without JS; show code block as copy-friendly
                 st.code(str(result))
         with cols[1]:
             st.info("Result saved to history.")
@@ -138,13 +146,9 @@ def trig_value(x: float, func: str):
 # ---------------- UI ----------------
 st.title("🧮 Bhanu's  Calculator")
 
-# Angle unit toggle (global UX improvement)
-st.toggle(
-    "Use radians (off = degrees)",
-    value=(st.session_state.angle_unit == "Radians"),
-    key="angle_toggle"
-)
-st.session_state.angle_unit = "Radians" if st.session_state.angle_toggle else "Degrees"
+# Angle unit toggle (use checkbox instead of st.toggle)
+use_radians = st.checkbox("Use radians (unchecked = degrees)", value=(st.session_state.angle_unit == "Radians"))
+st.session_state.angle_unit = "Radians" if use_radians else "Degrees"
 
 st.markdown("<div class='calc-card'>", unsafe_allow_html=True)
 
@@ -206,7 +210,6 @@ elif choice in ["Square Root","Cube Root","Logarithm (base 10)","Natural Log (ln
                 else:
                     result = math.sqrt(num)
             elif choice == "Cube Root":
-                # cube root works for negative too
                 result = math.copysign(abs(num) ** (1/3), num)
             elif choice == "Logarithm (base 10)":
                 if num <= 0:
@@ -265,85 +268,87 @@ elif choice == "Pi (constant)":
         result = math.pi
         show_result(result, choice, "π")
 
-# Memory options (enhanced)
+# Memory options (completed)
 elif choice == "Show Memory":
     st.info(f"Memory: {st.session_state.memory}" if st.session_state.memory is not None else "Memory is empty")
 
 elif choice == "Memory Add (M+)":
-    val = st.number_input("Add value to memory (M+)", value=0.0)
+    val = st.number_input("Add value to memory (M+)", value=0.0, key="mplus")
     if st.button("Apply M+"):
         if st.session_state.memory is None:
             st.session_state.memory = val
         else:
-            st.session_state.memory += val
+            try:
+                st.session_state.memory = float(st.session_state.memory) + float(val)
+            except Exception:
+                st.error("Memory currently holds a non-numeric value.")
         st.success(f"Memory updated: {st.session_state.memory}")
 
 elif choice == "Memory Subtract (M-)":
-    val = st.number_input("Subtract value from memory (M-)", value=0.0)
+    val = st.number_input("Subtract value from memory (M-)", value=0.0, key="mminus")
     if st.button("Apply M-"):
         if st.session_state.memory is None:
             st.session_state.memory = -val
         else:
-            st.session_state.memory -= val
+            try:
+                st.session_state.memory = float(st.session_state.memory) - float(val)
+            except Exception:
+                st.error("Memory currently holds a non-numeric value.")
         st.success(f"Memory updated: {st.session_state.memory}")
 
 elif choice == "Memory Recall (MR)":
-    if st.session_state.memory is not None:
-        st.success(f"Memory recalled: {st.session_state.memory}")
-    else:
-        st.warning("Memory is empty")
+    if st.button("Recall Memory"):
+        if st.session_state.memory is None:
+            st.info("Memory is empty.")
+        else:
+            show_result(st.session_state.memory, "Memory Recall", f"MR -> {st.session_state.memory}")
 
 elif choice == "Memory Clear (MC)":
-    st.session_state.memory = None
-    st.warning("Memory cleared")
+    if st.button("Clear Memory"):
+        st.session_state.memory = None
+        st.success("Memory cleared.")
 
 # Percentage
 elif choice == "Percentage":
-    num = st.number_input("Enter the number", value=0.0)
-    percent = st.number_input("Enter the percentage (%)", value=0.0)
-    if st.button("Calculate"):
+    base = st.number_input("Enter base number", value=0.0)
+    percent = st.number_input("Enter percentage", value=0.0)
+    if st.button("Calculate Percentage"):
         try:
-            result = (percent / 100.0) * num
-            show_result(result, choice, f"{percent}% of {num}")
-            st.session_state.memory = result
+            result = (base * percent) / 100.0
+            show_result(result, "Percentage", f"{base}, {percent}%")
         except Exception as e:
             st.error(f"Calculation error: {e}")
 
-# Mean
+# Average / Mean
 elif choice == "Average / Mean":
-    nums = st.text_input("Enter numbers separated by spaces (e.g., 10 20 30)")
-    if st.button("Calculate"):
-        vals = try_float_list(nums)
+    text = st.text_input("Enter numbers separated by spaces (e.g., 1 2 3 4)")
+    if st.button("Compute Mean"):
+        vals = try_float_list(text)
         if vals is None or len(vals) == 0:
             st.error("Please enter valid numbers separated by spaces.")
         else:
             result = sum(vals) / len(vals)
-            show_result(result, choice, nums)
-            st.session_state.memory = result
+            show_result(result, "Average / Mean", text)
 
 # Median
 elif choice == "Median":
-    nums = st.text_input("Enter numbers separated by spaces (e.g., 10 20 30)")
-    if st.button("Calculate"):
-        vals = try_float_list(nums)
+    text = st.text_input("Enter numbers separated by spaces (e.g., 1 2 3 4)")
+    if st.button("Compute Median"):
+        vals = try_float_list(text)
         if vals is None or len(vals) == 0:
             st.error("Please enter valid numbers separated by spaces.")
         else:
             vals.sort()
             n = len(vals)
-            result = vals[n//2] if n % 2 == 1 else (vals[n//2 - 1] + vals[n//2]) / 2
-            show_result(result, choice, nums)
-            st.session_state.memory = result
+            if n % 2 == 1:
+                result = vals[n // 2]
+            else:
+                result = (vals[n//2 - 1] + vals[n//2]) / 2.0
+            show_result(result, "Median", text)
 
-st.markdown("</div>", unsafe_allow_html=True)
+# ---------------- Footer / history display ----------------
+st.markdown("</div>", unsafe_allow_html=True)  # close calc-card
 
-# ---------------- History ----------------
-with st.expander("History"):
-    if not st.session_state.history:
-        st.write("No calculations yet.")
-    else:
-        for item in reversed(st.session_state.history):
-            st.write(f"[{item['time']}] {item['op']} | inputs: {item['inputs']} | result: {item['result']}")
-        if st.button("Clear history"):
-            st.session_state.history = []
-            st.success("History cleared.")
+if st.expander("Show calculation history"):
+    for item in reversed(st.session_state.history[-20:]):
+        st.write(f"{item['time']} — **{item['op']}** — inputs: {item['inputs']} — result: `{item['result']}`")
